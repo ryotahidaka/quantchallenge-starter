@@ -210,11 +210,11 @@ def train_model_elastic_net(data, sparse_data, pca_dimensions=0):
         pca = PCA(n_components=pca_dimensions)
         X = pca.fit_transform(X)
 
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=None)
 
-    model = ElasticNet(alpha=0.01, l1_ratio=0.015)
+    model = ElasticNet(alpha=0.0031622776601683794, l1_ratio=0.06)
     model.fit(X_train, y_train)
-    print(X_val)
+    # print(X_val)
     
     y_pred = model.predict(X_val)
     mse = mean_squared_error(y_val, y_pred)
@@ -231,6 +231,13 @@ def train_model_elastic_net(data, sparse_data, pca_dimensions=0):
 
 
 def find_best_parameters_for_elastic_net(data, sparse_data):
+    """
+    For Y1: Best alpha: 0.03593813663804626, Best l1_ratio: 0.1, 
+        Best MSE: 0.25489049648824 R^2 Score: 0.6902946858692584 R^2 Score for Y1, Y2: 0.7628473330753816, 0.6177420386631366
+
+    For Y2: Best alpha: 0.0031622776601683794, Best l1_ratio: 0.06, 
+        Best MSE: 0.26046565555464046 R^2 Score: 0.7030421686088779 R^2 Score for Y1, Y2: 0.7822381674083239, 0.6238461698094308
+    """
     feature_cols = data.columns[0:15]  # A to N
     feature_cols_sparse = sparse_data.columns[0:2]  # O to P
     target_cols = ['Y1', 'Y2']
@@ -247,10 +254,10 @@ def find_best_parameters_for_elastic_net(data, sparse_data):
     best_avg_alpha = None
     best_avg_l1_ratio = None
     best_avg_r2 = -float('inf')
-    best_avg_r2_for_y1, best_avg_r2_for_y2 = None, None
+    best_avg_r2_for_y1, best_avg_r2_for_y2 = -float('inf'), -float('inf')
 
-    for alpha in np.logspace(-2, -1, 5):
-        for l1_ratio in np.linspace(0.005, 0.015, 5):
+    for alpha in np.logspace(-3, -1, 10):
+        for l1_ratio in np.linspace(0.01, 0.1, 10):
             mse_list = []
             r2_list = []
             r2_y1_list = []
@@ -272,14 +279,15 @@ def find_best_parameters_for_elastic_net(data, sparse_data):
             avg_mse = np.mean(mse_list)
             avg_r2 = np.mean(r2_list)
             avg_r2_for_y1, avg_r2_for_y2 = np.mean(r2_y1_list), np.mean(r2_y2_list)
-            if best_avg_r2 < avg_r2:
+            if best_avg_r2_for_y1 < avg_r2_for_y1:
                 best_avg_mse = avg_mse
                 best_avg_alpha = alpha
                 best_avg_l1_ratio = l1_ratio
                 best_avg_r2 = avg_r2
                 best_avg_r2_for_y1, best_avg_r2_for_y2 = avg_r2_for_y1, avg_r2_for_y2
 
-            print(f'Alpha: {alpha}, L1 Ratio: {l1_ratio}, Avg MSE: {avg_mse}, Avg R^2: {avg_r2}, Avg R^2 for Y1, Y2: {avg_r2_for_y1}, {avg_r2_for_y2}')
+            print(f'Alpha: {round(alpha, 3)}, L1 Ratio: {round(l1_ratio, 3)}, Avg MSE: {round(avg_mse, 3)}, \
+                  Avg R^2: {round(avg_r2, 3)}, Avg R^2 for Y1, Y2: {round(avg_r2_for_y1, 3)}, {round(avg_r2_for_y2, 3)}')
 
     print(f'Best alpha: {best_avg_alpha}, Best l1_ratio: {best_avg_l1_ratio}, Best MSE: {best_avg_mse}', f'R^2 Score: {best_avg_r2}', f'R^2 Score for Y1, Y2: {best_avg_r2_for_y1}, {best_avg_r2_for_y2}')
     return best_avg_alpha, best_avg_l1_ratio
@@ -298,7 +306,7 @@ def pca_predict(model, pca, test_data, sparse_test_data):
     else:
         print("No PCA applied during prediction.")
     
-    print(X)
+    # print(X)
     predictions = model.predict(X)
     return predictions
 
@@ -306,7 +314,7 @@ def pca_predict(model, pca, test_data, sparse_test_data):
 if __name__ == "__main__":
     PCA_DIMENSIONS = 0
     MODEL = train_model_elastic_net
-    IMPUTER = KNNImputer(n_neighbors=5)
+    IMPUTER = KNNImputer(n_neighbors=4)
 
     print("Loading and preprocessing training data...")
     train_data = load_data("train.csv")
@@ -316,9 +324,9 @@ if __name__ == "__main__":
     sparse_data = load_data("train_new.csv")
     sparse_data = preprocess_sparse_data(sparse_data, IMPUTER)
 
-    # print("Finding best parameters for Elastic Net...")
-    # best_alpha, best_l1_ratio = find_best_parameters_for_elastic_net(train_data, sparse_data)
-    # print(f"Best parameters found: alpha={best_alpha}, l1_ratio={best_l1_ratio}")
+    print("Finding best parameters for Elastic Net...")
+    best_alpha, best_l1_ratio = find_best_parameters_for_elastic_net(train_data, sparse_data)
+    print(f"Best parameters found: alpha={best_alpha}, l1_ratio={best_l1_ratio}")
 
     print("Training model...")
     model, pca = MODEL(train_data, sparse_data, PCA_DIMENSIONS)
@@ -337,7 +345,7 @@ if __name__ == "__main__":
     output_df = pd.DataFrame(predictions, columns=['Y1', 'Y2'])
     output_df.index += 1  # Make index 1-based as per 'id' requirement
     output_df.index.name = 'id'
-    output_df.to_csv("predictions.csv")
+    output_df.to_csv("predictions_y2.csv")
 
     print("Predictions saved to predictions.csv")
 
