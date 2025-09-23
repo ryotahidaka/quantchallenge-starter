@@ -13,7 +13,7 @@ class Side(Enum):
 
 class Ticker(Enum):
     # TEAM_A (home team)
-    TEAM_A = 0
+    TEAM_A = 900
 
 def place_market_order(side: Side, ticker: Ticker, quantity: float) -> None:
     """Place a market order.
